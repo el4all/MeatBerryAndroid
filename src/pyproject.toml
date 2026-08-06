@@ -1,0 +1,22 @@
+[project]
+name = "mobappoffline"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "el4all",email = "oleksandr.kpab4ehko@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flet (>=0.86.1,<0.87.0)",
+    "loguru @ git+https://github.com/Delgan/loguru.git",
+    "pandas (>=3.0.3,<4.0.0)",
+    "requests (>=2.34.2,<3.0.0)"
+]
+
+[tool.poetry]
+packages = [{include = "mobappoffline", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
