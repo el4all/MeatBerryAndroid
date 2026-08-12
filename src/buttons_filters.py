@@ -22,8 +22,7 @@ def get_sort_menu(show_rabbits_list):
 
 def get_operations_by_rabbit(handle_operation):
     return ft.PopupMenuButton(tooltip='Операції',
-                              items=[ft.PopupMenuItem(content=ft.Text('Гніздо'), data='show_nest_info', on_click=handle_operation),
-                                     ft.PopupMenuItem(content=ft.Text('Встановити як вибраківку'), data='set_culling', on_click=handle_operation),
+                              items=[ft.PopupMenuItem(content=ft.Text('Встановити як вибраківку'), data='set_culling', on_click=handle_operation),
                                      ft.PopupMenuItem(content=ft.Text('Переміщення'), data='swap_box', on_click=handle_operation)])
 
 def get_nest_info_container(rabbit: Bunny):

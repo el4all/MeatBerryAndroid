@@ -14,6 +14,7 @@ STATUS_FOR_STR = {'mated': 'очікує на пальпацію', 'waiting_for_
 DATE_FORMAT = '%d.%m.%Y'
 DAYS = ['Понеділок',"Вівторок","Середа","Четвер","П'ятниця","Субота","Неділя"]
 
+
 class Farm:
     def __init__(self, name='MeatBerry'):
         self.name = name
@@ -189,6 +190,12 @@ class Farm:
             self.rabbits[name_in_from].box = new_box
             logger.info(f'{name_in_from} -> {to_box}  '
                   f'{from_box} is empty.')
+
+    def who_in_box(self, block, box):
+        for obj in self.rabbits.values():
+            if obj.block == block and obj.box == box:
+                return obj.name
+        return 'порожньо'
 
     def get_wrote_rating(self):
 
@@ -408,7 +415,6 @@ class Farm:
             print(f'{len(self.third_room)} loaded.')
         else:
             print('Not founded')
-
 
 class Bunny:
     def __init__(self, name, birthday,  box, status=None, **kwargs):
@@ -755,7 +761,7 @@ class Nest:
 
     def formed_nest(self, formed):
 
-        self.status = 'closed'
+        self.status = 'close'
         self.bunnies['formed'] = formed
         self.bunnies['alive'] = formed
 

@@ -4,7 +4,7 @@ import requests
 
 from bunny_classes import Farm, Bunny, Nest, Box, STATUS_WORK
 from work_with_files import open_and_read_json, write_json
-from helper_functions import create_rabbit_card, looking_for_work, set_rabbit_culling, change_box_for_rabbit
+from helper_functions import create_rabbit_card, looking_for_work, set_rabbit_culling, change_box_for_rabbit, rewrite_block_and_box
 from buttons_filters import BTN_SYNC, get_sort_menu, get_operations_by_rabbit, get_nest_info_container, get_text_fields_for_swap_boxes
 
 URL = 'https://drive.google.com/uc?export=download&id=1459S6Uo3w-f5i5KnDhV5XG0RFCNBDLgW'
@@ -132,9 +132,7 @@ def main(page: ft.Page):
             main_content.update()
         def handle_operation(e):
             operation = e.control.data
-            if operation == 'show_nest_info':
-                show_nest_info(bunny)
-            elif operation == 'set_culling':
+            if operation == 'set_culling':
                 set_rabbit_culling(bunny)
                 show_str(bunny)
             elif operation == 'swap_box':
@@ -144,6 +142,8 @@ def main(page: ft.Page):
                 block_input, box_input, result_field = get_text_fields_for_swap_boxes(handle_input)
                 def handle_save(e):
                     if change_box_for_rabbit(meatberry, bunny,block_input, box_input, result_field):
+                        block, box = change_box_for_rabbit(meatberry, bunny,block_input, box_input, result_field)
+                        rewrite_block_and_box(meatberry, bunny, block, box)
                         navigate_to(show_str,bunny)
                 main_content.content = ft.Column(controls=[ft.Text(f'Картка: {bunny.name}', size=22, weight=ft.FontWeight.BOLD),
                                                            ft.Text(value=str(bunny), size=20),
