@@ -1,11 +1,15 @@
 import flet as ft
 import requests
 
+from datetime import datetime, timedelta, time
 
 from bunny_classes import Farm, Bunny, Nest, Box, STATUS_WORK
 from work_with_files import open_and_read_json, write_json
-from helper_functions import create_rabbit_card, looking_for_work, set_rabbit_culling, change_box_for_rabbit, rewrite_block_and_box
-from buttons_filters import BTN_SYNC, get_sort_menu, get_operations_by_rabbit, get_nest_info_container, get_text_fields_for_swap_boxes
+from puthon_logic_func import (looking_for_work, set_rabbit_culling, rewrite_block_and_box, remove_by_death, remove_by_culling,
+                               vacant_index_for_rabbit)
+from helper_functions import create_rabbit_card, change_box_for_rabbit
+from buttons_filters import (BTN_SYNC, get_sort_menu, get_operations_by_rabbit, get_nest_info_container, get_text_fields_for_swap_boxes,
+                             get_operations_by_many_rabbits)
 
 URL = 'https://drive.google.com/uc?export=download&id=1459S6Uo3w-f5i5KnDhV5XG0RFCNBDLgW'
 
@@ -31,8 +35,18 @@ def main(page: ft.Page):
 
     page.title = "Моя Ферма"
     page.scroll = ft.ScrollMode.AUTO  # Дозволяє гортати екран, якщо список великий
+    dialog = ft.AlertDialog(title='eeee', modal=True)
+    page.overlay.append(dialog)
 
     navigation = []
+
+    def open_alert_dialog():
+        dialog.open = True
+        page.update()
+
+    def close_alert_dialog():
+        dialog.open = False
+        page.update()
 
     def navigate_to(func, *args):
         navigation.append((func, args))
@@ -80,9 +94,15 @@ def main(page: ft.Page):
     page.add(main_content)
     page.update()
 
-    def show_rabbit_list(by_what=None):
-        left_button = ft.Button('Операції', on_click=lambda e: print('list of operations'))
+    def show_rabbit_list(by_what=None, check_box=None):
+        def handle_operation(e):
+            operation = e.control.data
+            if operation == 'add_rabbit':
+                create_new_rabbit()
+
+        left_button = get_operations_by_many_rabbits(handle_operation)
         set_bottom_app_bar(left_button)
+
 
         def handle_sort(e):
             select_sort = e.control.data
@@ -118,7 +138,9 @@ def main(page: ft.Page):
                 item = ft.ListTile(leading=ft.Icon(ft.Icons.PETS), title=ft.Text(name),
                                    subtitle=ft.Text(f"Клітка: {meatberry.rabbits[name].str_block_box}"),
                                    bgcolor=color,
-                                   trailing=ft.Text(STATUS_WORK.get(process, ''), size=14, weight=ft.FontWeight.BOLD),
+                                   trailing=ft.Row(controls=[ft.Text(STATUS_WORK.get(process, ''), size=14, weight=ft.FontWeight.BOLD),
+                                                             ft.Checkbox(value=False, on_change=lambda e: print('Flag worked'))] if check_box else [ft.Text(STATUS_WORK.get(process, ''), size=14, weight=ft.FontWeight.BOLD)],
+                                                tight=True),
                                    on_click=lambda e, b=meatberry.rabbits[name]: navigate_to(show_str, b))
                 bunnies.controls.append(item)
             else:
@@ -132,9 +154,11 @@ def main(page: ft.Page):
             main_content.update()
         def handle_operation(e):
             operation = e.control.data
+
             if operation == 'set_culling':
                 set_rabbit_culling(bunny)
                 show_str(bunny)
+
             elif operation == 'swap_box':
                 def handle_input(e):
                     change_box_for_rabbit(meatberry, bunny, block_input, box_input, result_field)
@@ -152,6 +176,14 @@ def main(page: ft.Page):
                                                            ft.Button(content=ft.Text('Підтвердити'), on_click=handle_save)])
                 main_content.update()
 
+            elif operation == 'remove_by_death':
+                remove_by_death(meatberry, bunny)
+                show_rabbit_list()
+
+            elif operation == 'remove_by_culling':
+                remove_by_culling(meatberry, bunny)
+                show_rabbit_list()
+                
         right_button = get_operations_by_rabbit(handle_operation)
         set_bottom_app_bar()
         info = ft.Text(value=str(bunny), size=20)
@@ -174,8 +206,66 @@ def main(page: ft.Page):
         main_content.content = culling
         main_content.update()
 
+    def create_new_rabbit():
+        open_alert_dialog()
+
+        dialog.actions = [ft.Button('Скасувати додавання', on_click=close_alert_dialog)]
+
+        def handle_date(e):
+            if e.control.value:
+                selected_date = e.control.value + timedelta(hours=3)
+                dict_to_create_rabbit['birthday'] = selected_date.date()
+                dialog.content = ft.Text(f"Дата народження кролиці - "
+                                         f"{selected_date.strftime('%d.%m.%Y')}")
+                dialog.actions = [ft.Button('Так', on_click=lambda _: show_steps_for_add_new_rabbit(2)),
+                                  ft.Button('Ні', on_click=lambda _: show_steps_for_add_new_rabbit(1))]
+                dialog.update()
+
+        date_picker = ft.DatePicker(on_change=handle_date)
+        dict_to_create_rabbit = {}
+        name_input = ft.TextField(label='Введіть лінію')
+
+        def show_steps_for_add_new_rabbit(step):
+            def open_picker():
+                if date_picker not in page.overlay:
+                    page.overlay.append(date_picker)
+                date_picker.open = True
+                page.update()
+            if step == 1:
+                dialog.title = ft.Text('КРОК 1. Дата народження')
+                dialog.content = ft.Column([ft.Text('Оберіть дату народження кролиці')], tight=True)
+                dialog.actions.append(ft.Button('Відкрити календар', on_click=open_picker))
+
+                dialog.update()
+
+            elif step == 2:
+                if dict_to_create_rabbit.get('birthday'):
+
+                    def handle_input(e):
+
+                        if len(dialog.actions) > 2:
+                            dialog.actions = dialog.actions[:1]
+                            dialog.content = None
+                            dialog.update()
+
+                        if e.control.value:
+                            rabbit_line = e.control.value
+                            if len(rabbit_line) == 2:
+                                vacant_index = vacant_index_for_rabbit(meatberry, rabbit_line)
+                                dialog.content = ft.Text(f"Кролиця {rabbit_line}{vacant_index}")
+                                dialog.actions.extend([ft.Text(vacant_index, size=20),
+                                                       ft.Button('Далі', on_click=lambda _: show_steps_for_add_new_rabbit(3)),
+                                                       ft.Button('Назад', on_click=lambda _: show_steps_for_add_new_rabbit(2))])
+                                dialog.update()
+
+                    name_input.on_change = handle_input
+                    dialog.title = ft.Text('КРОК 2. Введіть імя')
+                    dialog.content = None
+                    dialog.actions.append(name_input)
+
+        show_steps_for_add_new_rabbit(1)
 
     # Стартова точка (функція)
     navigate_to(show_main_menu)
 # Запуск додатка
-ft.run(main)
+ft.run(main=main, assets_dir='assets')

@@ -33,17 +33,6 @@ def create_rabbit_card(work):
 
     return color
 
-def looking_for_work(rabbit: Bunny):
-    today = date.today()
-    if rabbit.all_planing_dates is not None:
-        for work, dates in rabbit.all_planing_dates.items():
-            if dates == today:
-                return work
-    return None
-
-def set_rabbit_culling(rabbit: Bunny):
-    rabbit.status = 'culling'
-
 def change_box_for_rabbit(farm: Farm, rabbit: Bunny, new_block: ft.TextField, new_box: ft.TextField, result_text: ft.Text):
     # block_for_rabbit_in_box = rabbit.block
     # print(f'Значення блоку для нового кроля {block_for_rabbit_in_box}')
@@ -91,21 +80,5 @@ def who_in_box(farm: Farm, block, box):
             return obj.name
     return 'порожньо'
 
-def rewrite_block_and_box(farm: Farm, bunny, block, box):
-    print(bunny.name, block, box)
-    rabbit_in_new_box = ''
-    moved_rabbit_block = bunny.block
-    moved_rabbit_box = bunny.box
-    for obj in farm.rabbits.values():
-        if obj.block == block and obj.box == box:
-            rabbit_in_new_box = obj
-            break
-    if rabbit_in_new_box:
-        rabbit_in_new_box.block = moved_rabbit_block
-        rabbit_in_new_box.box = moved_rabbit_box
-        bunny.block = block
-        bunny.box = box
-    else:
-        bunny.block = block
-        bunny.box = box
+
 
