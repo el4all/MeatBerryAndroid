@@ -208,8 +208,8 @@ def main(page: ft.Page):
 
     def create_new_rabbit():
         open_alert_dialog()
-
-        dialog.actions = [ft.Button('Скасувати додавання', on_click=close_alert_dialog)]
+        cancel_btn = ft.Button('Скасувати додавання', on_click=close_alert_dialog)
+        dialog.actions = [cancel_btn]
 
         def handle_date(e):
             if e.control.value:
@@ -223,7 +223,7 @@ def main(page: ft.Page):
 
         date_picker = ft.DatePicker(on_change=handle_date)
         dict_to_create_rabbit = {}
-        name_input = ft.TextField(label='Введіть лінію')
+        name_input = ft.TextField(label='Лінія', width=80, max_length=2, counter='')
 
         def show_steps_for_add_new_rabbit(step):
             def open_picker():
@@ -231,7 +231,9 @@ def main(page: ft.Page):
                     page.overlay.append(date_picker)
                 date_picker.open = True
                 page.update()
+
             if step == 1:
+                dialog.actions = [cancel_btn]
                 dialog.title = ft.Text('КРОК 1. Дата народження')
                 dialog.content = ft.Column([ft.Text('Оберіть дату народження кролиці')], tight=True)
                 dialog.actions.append(ft.Button('Відкрити календар', on_click=open_picker))
@@ -239,29 +241,37 @@ def main(page: ft.Page):
                 dialog.update()
 
             elif step == 2:
-                if dict_to_create_rabbit.get('birthday'):
 
-                    def handle_input(e):
+                def handle_input(e):
 
-                        if len(dialog.actions) > 2:
-                            dialog.actions = dialog.actions[:1]
-                            dialog.content = None
+                    if len(dialog.actions) > 2:
+                        need_elements = [dialog.actions[0], dialog.actions[-1]]
+                        dialog.actions = need_elements
+                        dialog.content = None
+                        dialog.update()
+
+                    if e.control.value:
+                        rabbit_line = e.control.value
+                        if len(rabbit_line) == 2:
+                            vacant_index = vacant_index_for_rabbit(meatberry, rabbit_line)
+                            dialog.content = ft.Text(f"Кролиця {rabbit_line}{vacant_index}")
+                            dialog.actions.remove(cancel_btn)
+                            dialog.actions.extend([ft.Text(vacant_index, size=20),
+                                                   ft.Button('Далі', on_click=lambda _: show_steps_for_add_new_rabbit(3)),
+                                                   ft.Button('Назад', on_click=lambda _: show_steps_for_add_new_rabbit(2)),
+                                                   cancel_btn])
                             dialog.update()
 
-                        if e.control.value:
-                            rabbit_line = e.control.value
-                            if len(rabbit_line) == 2:
-                                vacant_index = vacant_index_for_rabbit(meatberry, rabbit_line)
-                                dialog.content = ft.Text(f"Кролиця {rabbit_line}{vacant_index}")
-                                dialog.actions.extend([ft.Text(vacant_index, size=20),
-                                                       ft.Button('Далі', on_click=lambda _: show_steps_for_add_new_rabbit(3)),
-                                                       ft.Button('Назад', on_click=lambda _: show_steps_for_add_new_rabbit(2))])
-                                dialog.update()
-
+                if dict_to_create_rabbit.get('birthday'):
                     name_input.on_change = handle_input
-                    dialog.title = ft.Text('КРОК 2. Введіть імя')
-                    dialog.content = None
-                    dialog.actions.append(name_input)
+                dialog.title = ft.Text('КРОК 2. Введіть імя')
+                dialog.content = None
+                dialog.actions = [name_input, cancel_btn]
+                dialog.update()
+
+            elif step == 3:
+                dict_to_create_rabbit['name'] = name_input.value
+
 
         show_steps_for_add_new_rabbit(1)
 
