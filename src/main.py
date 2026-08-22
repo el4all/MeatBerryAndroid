@@ -1,17 +1,25 @@
+import json
+import  io
+
 import flet as ft
 import requests
 
 from datetime import datetime, timedelta, time
+from loguru import logger
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+from google.oauth2.service_account import Credentials
 
 from bunny_classes import Farm, Bunny, Nest, Box, STATUS_WORK
 from work_with_files import open_and_read_json, write_json
 from puthon_logic_func import (looking_for_work, set_rabbit_culling, rewrite_block_and_box, remove_by_death, remove_by_culling,
-                               vacant_index_for_rabbit)
+                               vacant_index_for_rabbit, empty_boxes, create_and_add_new_bunny)
 from helper_functions import create_rabbit_card, change_box_for_rabbit
 from buttons_filters import (BTN_SYNC, get_sort_menu, get_operations_by_rabbit, get_nest_info_container, get_text_fields_for_swap_boxes,
                              get_operations_by_many_rabbits)
 
 URL = 'https://drive.google.com/uc?export=download&id=1459S6Uo3w-f5i5KnDhV5XG0RFCNBDLgW'
+DATE_FORMAT = '%d.%m.%Y'
 
 def file_from_google():
     try:
@@ -23,6 +31,29 @@ def file_from_google():
     except Exception as e:
         print(f'Error download: {e}')
         return {'rabbits': {}}
+
+def file_upload_google():
+    SCOPES = ['https://www.googleapis.com/auth/drive']
+    creds = Credentials.from_service_account_file('meatberry_farm_for_gspread.json', scopes=SCOPES)
+    drive_service = build('drive','v3', credentials=creds)
+
+    FILE_ID = '1459S6Uo3w-f5i5KnDhV5XG0RFCNBDLgW'
+
+    print(meatberry.save_to_json())
+    json_string = json.dumps(meatberry.save_to_json(), ensure_ascii=False, indent=4)
+    print(json_string)
+
+    json_bytes = io.BytesIO(json_string.encode('utf-8'))
+    media = MediaIoBaseUpload(json_bytes, mimetype='application/json', resumable=True)
+
+    try:
+        drive_service.files().update(fileId=FILE_ID, media_body=media).execute()
+        print('Syncroo')
+        return True
+
+    except Exception as e:
+        print(e)
+        return False
 
 farm_dict = file_from_google()
 file_name = 'ACTUALLY_FARM.json'
@@ -39,6 +70,7 @@ def main(page: ft.Page):
     page.overlay.append(dialog)
 
     navigation = []
+    BTN_SYNC.on_click = file_upload_google
 
     def open_alert_dialog():
         dialog.open = True
@@ -158,15 +190,16 @@ def main(page: ft.Page):
             if operation == 'set_culling':
                 set_rabbit_culling(bunny)
                 show_str(bunny)
+                logger.info(f'{bunny.name} помічена як вибраковка')
 
             elif operation == 'swap_box':
                 def handle_input(e):
-                    change_box_for_rabbit(meatberry, bunny, block_input, box_input, result_field)
+                    change_box_for_rabbit(meatberry, block_input, box_input, result_field)
                     main_content.update()
                 block_input, box_input, result_field = get_text_fields_for_swap_boxes(handle_input)
                 def handle_save(e):
-                    if change_box_for_rabbit(meatberry, bunny,block_input, box_input, result_field):
-                        block, box = change_box_for_rabbit(meatberry, bunny,block_input, box_input, result_field)
+                    if change_box_for_rabbit(meatberry, block_input, box_input, result_field):
+                        block, box = change_box_for_rabbit(meatberry, block_input, box_input, result_field)
                         rewrite_block_and_box(meatberry, bunny, block, box)
                         navigate_to(show_str,bunny)
                 main_content.content = ft.Column(controls=[ft.Text(f'Картка: {bunny.name}', size=22, weight=ft.FontWeight.BOLD),
@@ -175,15 +208,18 @@ def main(page: ft.Page):
                                                            block_input, box_input, result_field,
                                                            ft.Button(content=ft.Text('Підтвердити'), on_click=handle_save)])
                 main_content.update()
+                logger.info(f'{bunny.name} --> {block_input}.{box_input}')
 
             elif operation == 'remove_by_death':
                 remove_by_death(meatberry, bunny)
                 show_rabbit_list()
+                logger.info(f'{bunny.name} померла')
 
             elif operation == 'remove_by_culling':
                 remove_by_culling(meatberry, bunny)
                 show_rabbit_list()
-                
+                logger.info(f'{bunny.name} вибракована')
+
         right_button = get_operations_by_rabbit(handle_operation)
         set_bottom_app_bar()
         info = ft.Text(value=str(bunny), size=20)
@@ -208,22 +244,57 @@ def main(page: ft.Page):
 
     def create_new_rabbit():
         open_alert_dialog()
+
         cancel_btn = ft.Button('Скасувати додавання', on_click=close_alert_dialog)
+
         dialog.actions = [cancel_btn]
 
         def handle_date(e):
             if e.control.value:
                 selected_date = e.control.value + timedelta(hours=3)
-                dict_to_create_rabbit['birthday'] = selected_date.date()
+                dict_to_create_rabbit['birthday'] = selected_date.date().strftime(DATE_FORMAT)
                 dialog.content = ft.Text(f"Дата народження кролиці - "
                                          f"{selected_date.strftime('%d.%m.%Y')}")
                 dialog.actions = [ft.Button('Так', on_click=lambda _: show_steps_for_add_new_rabbit(2)),
                                   ft.Button('Ні', on_click=lambda _: show_steps_for_add_new_rabbit(1))]
                 dialog.update()
 
+        def handle_input(e):
+
+            if change_box_for_rabbit(meatberry, block_field, box_field, result_point):
+                block, box = change_box_for_rabbit(meatberry, block_field, box_field, result_point)
+                if to_create_bunny_obj_btn not in dialog.actions:
+                    dialog.actions.append(to_create_bunny_obj_btn)
+            else:
+                dialog.actions = [block_field, box_field, result_point, cancel_btn]
+            dialog.update()
+
+        def final_create_bunny():
+            dict_to_create_rabbit['block'] = block_field.value
+            dict_to_create_rabbit['box'] = box_field.value
+
+            if create_and_add_new_bunny(meatberry, dict_to_create_rabbit['birthday'], dict_to_create_rabbit['name'],
+                                     dict_to_create_rabbit['block'], dict_to_create_rabbit['box']):
+                dialog.title = ft.Text('Кролицю додано')
+                dialog.content = ft.Text(f'')
+                dialog.actions = [ft.Button('OK', on_click=close_alert_dialog)]
+
+                dialog.update()
+                show_rabbit_list()
+                logger.info(f'Кролиця {dict_to_create_rabbit['name']} додана в клітку {dict_to_create_rabbit['block']}.{dict_to_create_rabbit['box']}')
+
+            else:
+                dialog.title = ft.Text('Щось пішло не так')
+                dialog.content = ft.Text('')
+                dialog.actions = [ft.Button('Спробувати знову', on_click=lambda _: show_steps_for_add_new_rabbit(1))]
+
+                dialog.update()
+
         date_picker = ft.DatePicker(on_change=handle_date)
         dict_to_create_rabbit = {}
         name_input = ft.TextField(label='Лінія', width=80, max_length=2, counter='')
+        block_field, box_field, result_point = get_text_fields_for_swap_boxes(handle_input)
+        to_create_bunny_obj_btn = ft.Button('Далі', on_click=final_create_bunny)
 
         def show_steps_for_add_new_rabbit(step):
             def open_picker():
@@ -270,8 +341,13 @@ def main(page: ft.Page):
                 dialog.update()
 
             elif step == 3:
-                dict_to_create_rabbit['name'] = name_input.value
+                dict_to_create_rabbit['name'] = name_input.value + str(vacant_index_for_rabbit(meatberry, name_input.value))
+                print(dict_to_create_rabbit)
 
+                dialog.title = 'КРОК 3. Розміщення кролиці'
+                dialog.content = ft.Text('Введіть номера блоку та клітки')
+                dialog.actions = [block_field, box_field, result_point, cancel_btn]
+                dialog.update()
 
         show_steps_for_add_new_rabbit(1)
 
@@ -279,3 +355,7 @@ def main(page: ft.Page):
     navigate_to(show_main_menu)
 # Запуск додатка
 ft.run(main=main, assets_dir='assets')
+
+
+if __name__ == '__main__':
+    pass

@@ -5,7 +5,7 @@ STATUS_FOR_NEST = dict([('install', 'встановлене порожнє'), ('
                         ('open', 'відкрите'), ('remove', 'без будки з кролями')])
 
 
-BTN_SYNC = ft.IconButton(icon=ft.Icons.SYNC, tooltip='Синхронізувати з GoogleDisc', on_click=lambda e: print('Синхронізація...'))
+BTN_SYNC = ft.IconButton(icon=ft.Icons.SYNC, tooltip='Синхронізувати з GoogleDisc')
 
 
 

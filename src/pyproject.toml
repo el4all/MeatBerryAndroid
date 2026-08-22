@@ -11,7 +11,9 @@ dependencies = [
     "flet (>=0.86.1,<0.87.0)",
     "loguru @ git+https://github.com/Delgan/loguru.git",
     "pandas (>=3.0.3,<4.0.0)",
-    "requests (>=2.34.2,<3.0.0)"
+    "requests (>=2.34.2,<3.0.0)",
+    "google-api-python-client (>=2.199.0,<3.0.0)",
+    "google-auth (>=2.56.3,<3.0.0)"
 ]
 
 [tool.poetry]
@@ -20,3 +22,9 @@ packages = [{include = "mobappoffline", from = "src"}]
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.flet.app]
+path = "."
+
+[tool.flet.android]
+icon = "assets/Icon_for_app.png"

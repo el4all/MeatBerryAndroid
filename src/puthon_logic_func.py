@@ -2,6 +2,9 @@ from datetime import date
 
 from bunny_classes import  Farm, Bunny
 
+BOXES = dict([(1,[x for x in range(1,21)]),(2,[x for x in range(1,21)]),(3,[x for x in range(1,21)]),(4,[x for x in range(1,21)]),
+              (5,[x for x in range(1,21)]),(6,[x for x in range(1,26)]),(7,[x for x in range(1,21)]),(8,[x for x in range(1,21)]),
+              (9,[x for x in range(1,21)]),(10,[x for x in range(1,21)]),(11,[x for x in range(1,13)]),(12,[x for x in range(1,13)])])
 
 def looking_for_work(rabbit: Bunny):
     today = date.today()
@@ -61,3 +64,25 @@ def vacant_index_for_rabbit(farm: Farm, line: str):
     free_indexes = [x for x in set(range(1, len(indexes)+1)) - set(indexes)]
 
     return free_indexes[0] if free_indexes else len(indexes)+1
+
+def empty_boxes(farm: Farm):
+    all_boxes = BOXES.copy()
+    more_then_one = {}
+
+    for obj in farm.rabbits.values():
+        if obj.block in BOXES and obj.box in all_boxes[obj.block]:
+            all_boxes[obj.block].remove(obj.box)
+        else:
+            more_then_one.setdefault(obj.block, []).append(obj.box)
+
+    print(all_boxes)
+    print(more_then_one)
+
+def create_and_add_new_bunny(farm: Farm, birthday: date, name, block, box):
+    if name not in farm.rabbits:
+        bunny_obj = Bunny(name, birthday, block, box)
+        farm.rabbits[name] = bunny_obj
+
+        return True
+    else:
+        return False

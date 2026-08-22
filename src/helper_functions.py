@@ -33,25 +33,19 @@ def create_rabbit_card(work):
 
     return color
 
-def change_box_for_rabbit(farm: Farm, rabbit: Bunny, new_block: ft.TextField, new_box: ft.TextField, result_text: ft.Text):
-    # block_for_rabbit_in_box = rabbit.block
-    # print(f'Значення блоку для нового кроля {block_for_rabbit_in_box}')
-    # box_for_rabbit_in_box = rabbit.box
-    # print(f'Значення клітки для нового кроля {box_for_rabbit_in_box}')
+def change_box_for_rabbit(farm: Farm, new_block: ft.TextField, new_box: ft.TextField, result_text: ft.Text):
     new_block.error = None
     new_box.error = None
 
     has_error = False
 
     block_val = new_block.value.strip() if new_block.value else ''
-    print(f'Значення в полі блоку {type(block_val), block_val}')
     if not block_val or not block_val.isdigit():
         new_block.error = 'Введіть блок'
         has_error = True
     new_block.update()
 
     box_val = new_box.value.strip() if new_box.value else ''
-    print(f'Значення в полі клітки {type(box_val), box_val}')
     if not box_val or not box_val.isdigit():
         new_box.error = 'Введіть клітку'
         has_error = True
@@ -61,14 +55,12 @@ def change_box_for_rabbit(farm: Farm, rabbit: Bunny, new_block: ft.TextField, ne
     if has_error:
         return False
 
-    print('Значення полів вірні. Ідемо до перезапису')
-
-
     name = ''
     if block_val.isdigit() and box_val.isdigit():
         name = who_in_box(farm, block_val, box_val)
-    print(f"Ім'я кроля в клітці {name}")
     result_text.value = f"В клітці {block_val}.{box_val} - {name} "
+
+    result_text.update()
 
     return int(block_val), int(box_val)
 

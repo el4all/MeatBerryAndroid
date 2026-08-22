@@ -21,7 +21,14 @@ class Farm:
         self.rabbits: dict[str, Bunny] = {}
         self.third_room: dict[str, Box] = {}
         self.morgue = []
+        self.morgue_for_third_room = {}
         self.defective = []
+        self.history_logs = []
+
+        logger.remove()
+        logger.add(lambda msg: print(msg, end=''))
+        logger.add(lambda msg: self.history_logs.append(msg.strip()),
+                   format='[{time:DD.MM.YYYY HH:mm}] {message}')
 
     @property
     def active(self):
@@ -351,25 +358,22 @@ class Farm:
 
         write_json(name_file, new)
 
-    def planned_work_sheet(self, start, end):
-        pass
-
     def save_to_json(self, file_name='MeatBerryFarm.json'):
         export_data = {
             'farm_name': self.name,
             'rabbits': {},
             'third_room': {},
             'morgue': self.morgue,
-            'defective': self.defective
+            'morgue_for_third_room': self.morgue_for_third_room,
+            'defective': self.defective,
+            'history_logs': self.history_logs
         }
         for name, bunny_obj in self.rabbits.items():
             export_data['rabbits'][name] = bunny_obj.to_dict()
         for box_num, box_obj in self.third_room.items():
             export_data['third_room'][box_num] = box_obj.to_dict()
 
-        with open(file_name, 'w', encoding='utf-8') as f:
-            json.dump(export_data, f, ensure_ascii=False, indent=4)
-            print('Data saved.')
+        return export_data
 
     def load_from_json(self, file_name='MeatBerryFarm_for_tests.json'):
         try:
@@ -379,7 +383,9 @@ class Farm:
                 self.rabbits = {}
                 self.third_room = {}
                 self.morgue = farm_dict.get('morgue', [])
+                self.morgue_for_third_room = farm_dict.get('morgue_for_third_room', {})
                 self.defective = farm_dict.get('defective', [])
+                self.history_logs = farm_dict('history_logs', [])
                 raw_rabbits = farm_dict.get('rabbits', {})
                 raw_boxes = farm_dict.get('third_room', {})
 
@@ -402,6 +408,7 @@ class Farm:
             self.third_room = {}
             self.morgue = farm_dict.get('morgue', [])
             self.defective = farm_dict.get('defective', [])
+            self.history_logs = farm_dict.get('history_logs', [])
             raw_rabbits = farm_dict.get('rabbits', {})
             raw_boxes = farm_dict.get('third_room', {})
 
@@ -417,11 +424,11 @@ class Farm:
             print('Not founded')
 
 class Bunny:
-    def __init__(self, name, birthday,  box, status=None, **kwargs):
+    def __init__(self, name, birthday: str, block ,box, status=None, **kwargs):
 
         self.name = name   # ID bunny
 
-        self.block = kwargs.get('block')
+        self.block = block
 
         self.box = box
 
@@ -809,10 +816,11 @@ class Nest:
 
 
 class Box:
-    def __init__(self, block, box, quantity, birth, mother=None, father=None,  kill_date=None):
+    def __init__(self, block, box, quantity, birth, status= None, mother=None, father=None,  kill_date=None):
         self.block = block
         self.box = box
         self.quantity = quantity
+        self.status= status
         self.birth: date = birth if isinstance(birth, date) else datetime.strptime(birth, DATE_FORMAT).date()
         self.mother = mother
         self.father = father
@@ -825,13 +833,14 @@ class Box:
     def from_dict_box(cls, data: dict):
         block = data['block']
         box = data['box']
+        status = data['status']
         mother = data['mother']
         father = data['father']
         quantity = data['quantity']
         birth = datetime.strptime(data['birth'], DATE_FORMAT).date()
         kill_date = datetime.strptime(data['kill_date'], DATE_FORMAT).date()
 
-        cage = cls(block=block, box=box, quantity=quantity, birth=birth, mother=mother, father=father, kill_date=kill_date)
+        cage = cls(block=block, box=box, status=status, quantity=quantity, birth=birth, mother=mother, father=father, kill_date=kill_date)
 
         return cage
 
