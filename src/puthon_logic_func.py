@@ -14,8 +14,9 @@ def looking_for_work(rabbit: Bunny):
                 return work
     return None
 
-def set_rabbit_culling(rabbit: Bunny):
+def set_rabbit_culling(farm: Farm, rabbit: Bunny):
     rabbit.status = 'culling'
+    farm.defective.append(rabbit.name)
 
 def rewrite_block_and_box(farm: Farm, bunny, block, box):
     print(bunny.name, block, box)
@@ -36,6 +37,8 @@ def rewrite_block_and_box(farm: Farm, bunny, block, box):
         bunny.box = box
 
 def remove_by_death(farm: Farm, bunny):
+    farm.morgue.append([bunny.name, bunny.age, bunny.history])
+
     if bunny.name in farm.defective:
         farm.defective.remove(bunny.name)
 

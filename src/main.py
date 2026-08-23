@@ -39,16 +39,13 @@ def file_upload_google():
 
     FILE_ID = '1459S6Uo3w-f5i5KnDhV5XG0RFCNBDLgW'
 
-    print(meatberry.save_to_json())
     json_string = json.dumps(meatberry.save_to_json(), ensure_ascii=False, indent=4)
-    print(json_string)
 
     json_bytes = io.BytesIO(json_string.encode('utf-8'))
     media = MediaIoBaseUpload(json_bytes, mimetype='application/json', resumable=True)
 
     try:
         drive_service.files().update(fileId=FILE_ID, media_body=media).execute()
-        print('Syncroo')
         return True
 
     except Exception as e:
@@ -108,7 +105,7 @@ def main(page: ft.Page):
 
         main_content.content = ft.Column([ft.Text('Головне меню ферми', size=16, weight=ft.FontWeight.W_500),
                                           ft.ListTile(leading=ft.Icon(ft.Icons.PETS), title=ft.Text('Кролиці'), on_click=lambda e: navigate_to(show_rabbit_list)),
-                                          ft.ListTile(leading=ft.Icon(ft.Icons.PETS), title=ft.Text('Третя кімната')),
+                                          ft.ListTile(leading=ft.Icon(ft.Icons.PETS), title=ft.Text('Третя кімната'), on_click=lambda e: navigate_to(show_third_room_list)),
                                           ft.ListTile(leading=ft.Icon(ft.Icons.CASINO), title=ft.Text('Кладовище')),
                                           ft.ListTile(leading=ft.Icon(ft.Icons.NIGHTLIFE), title=ft.Text('Вибраківка'), on_click= lambda e: navigate_to(show_defective))
                                           ])
@@ -173,14 +170,29 @@ def main(page: ft.Page):
                                    trailing=ft.Row(controls=[ft.Text(STATUS_WORK.get(process, ''), size=14, weight=ft.FontWeight.BOLD),
                                                              ft.Checkbox(value=False, on_change=lambda e: print('Flag worked'))] if check_box else [ft.Text(STATUS_WORK.get(process, ''), size=14, weight=ft.FontWeight.BOLD)],
                                                 tight=True),
-                                   on_click=lambda e, b=meatberry.rabbits[name]: navigate_to(show_str, b))
+                                   on_click=lambda e, b=meatberry.rabbits[name]: navigate_to(show_str_rabbit, b))
                 bunnies.controls.append(item)
             else:
                 print(f'{rabbit} not founded.')
         main_content.content = bunnies
         main_content.update()
 
-    def show_str(bunny: Bunny):
+    def show_third_room_list():
+        set_appbar()
+        set_bottom_app_bar()
+
+        boxes = ft.Column()
+
+        for num, cages in meatberry.third_room.items():
+            obj_box = meatberry.third_room[num]
+            item = ft.ListTile(leading=ft.Icon(ft.Icons.GRID_VIEW), title=ft.Text(num), subtitle=ft.Text(f"Клітка: {num}"),
+                               on_click=lambda e, b=obj_box: navigate_to(show_str_box, b))
+            boxes.controls.append(item)
+
+        main_content.content = boxes
+        main_content.update()
+
+    def show_str_rabbit(bunny: Bunny):
         def show_nest_info(rabbit):
             main_content.content = get_nest_info_container(rabbit)
             main_content.update()
@@ -188,8 +200,8 @@ def main(page: ft.Page):
             operation = e.control.data
 
             if operation == 'set_culling':
-                set_rabbit_culling(bunny)
-                show_str(bunny)
+                set_rabbit_culling(meatberry, bunny)
+                show_str_rabbit(bunny)
                 logger.info(f'{bunny.name} помічена як вибраковка')
 
             elif operation == 'swap_box':
@@ -201,7 +213,7 @@ def main(page: ft.Page):
                     if change_box_for_rabbit(meatberry, block_input, box_input, result_field):
                         block, box = change_box_for_rabbit(meatberry, block_input, box_input, result_field)
                         rewrite_block_and_box(meatberry, bunny, block, box)
-                        navigate_to(show_str,bunny)
+                        navigate_to(show_str_rabbit,bunny)
                 main_content.content = ft.Column(controls=[ft.Text(f'Картка: {bunny.name}', size=22, weight=ft.FontWeight.BOLD),
                                                            ft.Text(value=str(bunny), size=20),
                                                            ft.Divider(),
@@ -230,14 +242,26 @@ def main(page: ft.Page):
 
         page.update()
 
+    def show_str_box(box: Box):
+        info = ft.Text(value=str(box), size=20)
+
+        main_content.content = ft.Column([ft.Divider(), ft.Text(f'Картка: {box.block}.{box.box}', size=22, weight=ft.FontWeight.BOLD), info])
+
+        main_content.update()
+
     def show_defective(e=None):
+
         text = ft.Text(f'Вибраковані кролиці ({len(meatberry.defective)})', size=22, weight=ft.FontWeight.BOLD)
         culling = ft.Column([text])
 
         for num, name in enumerate(meatberry.defective, 1):
-            item = ft.ListTile(leading=ft.Icon(ft.Icons.PETS),  title=ft.Text(name),  subtitle=ft.Text(f'{meatberry.rabbits[name].str_block_box if name in meatberry.rabbits else 'Вже померла'}'), on_click=lambda e:navigate_to(show_str, meatberry.rabbits[name]))
+            obj_rabbit = meatberry.rabbits.get(name)
+            subtitle_text = ft.Text(f'{meatberry.rabbits[name].str_block_box if name in meatberry.rabbits else 'Вже померла'}')
+            item = ft.ListTile(leading=ft.Icon(ft.Icons.PETS),  title=ft.Text(name),  subtitle=subtitle_text,
+                               on_click=lambda e, r=obj_rabbit: navigate_to(show_str_rabbit, r))
             culling.controls.append(item)
 
+        set_appbar()
         set_bottom_app_bar()
         main_content.content = culling
         main_content.update()

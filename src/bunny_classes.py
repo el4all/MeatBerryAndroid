@@ -11,6 +11,7 @@ STATUS_WORK = dict([('mate','запліднення'),('palpation','пальпа
                     ('vaccination nest','вакцинація гнізда'),('prepare nest','підготовка гнізда'),('swap box','перміщення')])
 STATUS_FOR_STR = {'mated': 'очікує на пальпацію', 'waiting_for_kindling': 'очікує на окріл', 'mother': 'матір',
           'mated mother': 'запліднена матір', 'mother*': 'матір без гнізда', 'culling': 'вибраківка', None:'немає'}
+STATUS_FOR_3_ROOM = {'meat': "м'ясо", 'repare': 'ремонт', 'feeding': 'догодівля'}
 DATE_FORMAT = '%d.%m.%Y'
 DAYS = ['Понеділок',"Вівторок","Середа","Четвер","П'ятниця","Субота","Неділя"]
 
@@ -827,7 +828,10 @@ class Box:
         self.kill_date: date = kill_date
 
     def __str__(self):
-        return ''
+        return (f'Клітка {self.block}.{self.box}\n'
+                f'Дата народження {self.birth.strftime(DATE_FORMAT)}\n'
+                f'Статус {STATUS_FOR_3_ROOM.get(self.status)}, кількість - {self.quantity}\n'
+                f'Дата забою {self.kill_date}')
 
     @classmethod
     def from_dict_box(cls, data: dict):
