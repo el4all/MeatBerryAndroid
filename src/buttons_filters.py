@@ -85,7 +85,7 @@ def get_little_containers_afterwork(text):
 def get_main_container_for_trailing(data: dict):
     trailing_widget = None
     if data:
-        trailing_widget = ft.Container(width=80, height=70, offset=ft.Offset(0, -0.35),
+        trailing_widget = ft.Container(width=80, height=70,
                                        content=ft.Column(controls=[get_little_containers_prework(data.get('tomorrow', None)),
                                                                    get_little_containers_today(data.get('today', None)),
                                                                    get_little_containers_afterwork(data.get('yesterday', None))],
