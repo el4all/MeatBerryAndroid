@@ -1,25 +1,30 @@
 import json
 import  io
+import os
+
 
 import flet as ft
 import requests
 
 from datetime import datetime, timedelta, time
+
+from flet import SnackBarBehavior
 from loguru import logger
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 from google.oauth2.service_account import Credentials
+from google.auth.transport.requests import Request
+from pathlib import Path
 
 from bunny_classes import Farm, Bunny, Nest, Box, STATUS_WORK
 from work_with_files import open_and_read_json, write_json
 from puthon_logic_func import (looking_for_work, set_rabbit_culling, rewrite_block_and_box, remove_by_death, remove_by_culling,
-                               vacant_index_for_rabbit, empty_boxes, create_and_add_new_bunny)
+                               vacant_index_for_rabbit, empty_boxes, create_and_add_new_bunny, search_process_date_for_rabbit)
 from helper_functions import create_rabbit_card, change_box_for_rabbit
 from buttons_filters import (BTN_SYNC, get_sort_menu, get_operations_by_rabbit, get_nest_info_container, get_text_fields_for_swap_boxes,
-                             get_operations_by_many_rabbits)
+                             get_operations_by_many_rabbits, get_main_container_for_trailing)
 
 URL = 'https://drive.google.com/uc?export=download&id=1459S6Uo3w-f5i5KnDhV5XG0RFCNBDLgW'
 DATE_FORMAT = '%d.%m.%Y'
+FILE_ID = '1459S6Uo3w-f5i5KnDhV5XG0RFCNBDLgW'
 
 def file_from_google():
     try:
@@ -33,20 +38,28 @@ def file_from_google():
         return {'rabbits': {}}
 
 def file_upload_google():
-    SCOPES = ['https://www.googleapis.com/auth/drive']
-    creds = Credentials.from_service_account_file('meatberry_farm_for_gspread.json', scopes=SCOPES)
-    drive_service = build('drive','v3', credentials=creds)
-
-    FILE_ID = '1459S6Uo3w-f5i5KnDhV5XG0RFCNBDLgW'
-
-    json_string = json.dumps(meatberry.save_to_json(), ensure_ascii=False, indent=4)
-
-    json_bytes = io.BytesIO(json_string.encode('utf-8'))
-    media = MediaIoBaseUpload(json_bytes, mimetype='application/json', resumable=True)
-
     try:
-        drive_service.files().update(fileId=FILE_ID, media_body=media).execute()
-        return True
+        BASE_DIR = Path(__file__).resolve().parent
+        KEY_PATH = str(BASE_DIR / 'meatberry_farm_for_gspread.json')
+
+        SCOPES = ['https://www.googleapis.com/auth/drive']
+        creds = Credentials.from_service_account_file(KEY_PATH, scopes=SCOPES)
+        creds.refresh(Request())
+        access_token = creds.token
+
+        json_string = json.dumps(meatberry.save_to_json(), ensure_ascii=False, indent=4)
+
+        url = f'https://www.googleapis.com/upload/drive/v3/files/{FILE_ID}?uploadType=media'
+        headers = {'Authorization': f'Bearer {access_token}', 'Content_Type': 'application/json'}
+
+        response = requests.patch(url, headers=headers, data=json_string)
+
+        if response.status_code == 200:
+            logger.info('Синхронізовано')
+            return True
+        else:
+            logger.error(f'Помилка {response.status_code} - {response.text}.')
+            return False
 
     except Exception as e:
         print(e)
@@ -64,10 +77,10 @@ def main(page: ft.Page):
     page.title = "Моя Ферма"
     page.scroll = ft.ScrollMode.AUTO  # Дозволяє гортати екран, якщо список великий
     dialog = ft.AlertDialog(title='eeee', modal=True)
+
     page.overlay.append(dialog)
 
     navigation = []
-    BTN_SYNC.on_click = file_upload_google
 
     def open_alert_dialog():
         dialog.open = True
@@ -76,6 +89,21 @@ def main(page: ft.Page):
     def close_alert_dialog():
         dialog.open = False
         page.update()
+
+    def quick_message(message: str, is_error: bool):
+        snack = ft.SnackBar(content=ft.Text(message), duration=3000, behavior=SnackBarBehavior.FLOATING,
+                            bgcolor=ft.Colors.RED_100 if is_error else ft.Colors.BLUE_GREY_700, open=True)
+        page.overlay.clear()
+        page.overlay.append(snack)
+        page.update()
+
+    def synchronization():
+        if file_upload_google():
+            quick_message('Синхронізовано успішно', False)
+        else:
+            quick_message('Не вдалося синхронізувати', True)
+
+    BTN_SYNC.on_click = synchronization
 
     def navigate_to(func, *args):
         navigation.append((func, args))
@@ -106,7 +134,6 @@ def main(page: ft.Page):
         main_content.content = ft.Column([ft.Text('Головне меню ферми', size=16, weight=ft.FontWeight.W_500),
                                           ft.ListTile(leading=ft.Icon(ft.Icons.PETS), title=ft.Text('Кролиці'), on_click=lambda e: navigate_to(show_rabbit_list)),
                                           ft.ListTile(leading=ft.Icon(ft.Icons.PETS), title=ft.Text('Третя кімната'), on_click=lambda e: navigate_to(show_third_room_list)),
-                                          ft.ListTile(leading=ft.Icon(ft.Icons.CASINO), title=ft.Text('Кладовище')),
                                           ft.ListTile(leading=ft.Icon(ft.Icons.NIGHTLIFE), title=ft.Text('Вибраківка'), on_click= lambda e: navigate_to(show_defective))
                                           ])
         set_appbar(right_actions=BTN_SYNC)
@@ -128,7 +155,8 @@ def main(page: ft.Page):
             operation = e.control.data
             if operation == 'add_rabbit':
                 create_new_rabbit()
-
+        if dialog and dialog.open:
+            close_alert_dialog()
         left_button = get_operations_by_many_rabbits(handle_operation)
         set_bottom_app_bar(left_button)
 
@@ -146,8 +174,8 @@ def main(page: ft.Page):
 
         if by_what == 'by_name':
             names = sorted(name_for_sort, key=lambda x: (x[:2], int(x[2:])))
-        elif by_what == 'by_box':
-            names = sorted(name_for_sort, key=lambda x: (meatberry.rabbits[x].block, meatberry.rabbits[x].box))
+        elif by_what == 'by_time_add':
+            names = name_for_sort
         elif by_what == 'by_age_up':
             names = sorted(name_for_sort, key=lambda x: meatberry.rabbits[x].age)
         elif by_what == 'by_age_down':
@@ -157,19 +185,22 @@ def main(page: ft.Page):
         elif by_what == 'by_rating_down':
             names = sorted(name_for_sort, key=lambda x: meatberry.rabbits[x].rating, reverse=True)
         else:
-            names = name_for_sort
+            names = sorted(name_for_sort, key=lambda x: (meatberry.rabbits[x].block, meatberry.rabbits[x].box))
 
         for name in names:
             rabbit = meatberry.rabbits[name]
             if rabbit is not None:
+
+                pairs_work_color = search_process_date_for_rabbit(rabbit)
+                main_container = get_main_container_for_trailing(pairs_work_color)
+
                 process = looking_for_work(rabbit)
                 color = create_rabbit_card(process)
                 item = ft.ListTile(leading=ft.Icon(ft.Icons.PETS), title=ft.Text(name),
                                    subtitle=ft.Text(f"Клітка: {meatberry.rabbits[name].str_block_box}"),
                                    bgcolor=color,
-                                   trailing=ft.Row(controls=[ft.Text(STATUS_WORK.get(process, ''), size=14, weight=ft.FontWeight.BOLD),
-                                                             ft.Checkbox(value=False, on_change=lambda e: print('Flag worked'))] if check_box else [ft.Text(STATUS_WORK.get(process, ''), size=14, weight=ft.FontWeight.BOLD)],
-                                                tight=True),
+                                   trailing=main_container,
+                                   content_padding=ft.Padding.symmetric(horizontal=16, vertical=9),
                                    on_click=lambda e, b=meatberry.rabbits[name]: navigate_to(show_str_rabbit, b))
                 bunnies.controls.append(item)
             else:
@@ -224,12 +255,18 @@ def main(page: ft.Page):
 
             elif operation == 'remove_by_death':
                 remove_by_death(meatberry, bunny)
-                show_rabbit_list()
+                open_alert_dialog()
+                dialog.title = ft.Text(f'Кролиця {bunny.name} видалена')
+                dialog.actions = [ft.Button('OK', on_click=show_rabbit_list)]
+                dialog.update()
                 logger.info(f'{bunny.name} померла')
 
             elif operation == 'remove_by_culling':
                 remove_by_culling(meatberry, bunny)
-                show_rabbit_list()
+                open_alert_dialog()
+                dialog.title = ft.Text(f'Кролиця {bunny.name} видалена')
+                dialog.actions = [ft.Button('OK', on_click=show_rabbit_list)]
+                dialog.update()
                 logger.info(f'{bunny.name} вибракована')
 
         right_button = get_operations_by_rabbit(handle_operation)

@@ -12,7 +12,6 @@ dependencies = [
     "loguru @ git+https://github.com/Delgan/loguru.git",
     "pandas (>=3.0.3,<4.0.0)",
     "requests (>=2.34.2,<3.0.0)",
-    "google-api-python-client (>=2.199.0,<3.0.0)",
     "google-auth (>=2.56.3,<3.0.0)"
 ]
 

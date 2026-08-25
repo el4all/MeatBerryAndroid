@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from bunny_classes import  Farm, Bunny
 
@@ -81,7 +81,7 @@ def empty_boxes(farm: Farm):
     print(all_boxes)
     print(more_then_one)
 
-def create_and_add_new_bunny(farm: Farm, birthday: date, name, block, box):
+def create_and_add_new_bunny(farm: Farm, birthday: str, name, block, box):
     if name not in farm.rabbits:
         bunny_obj = Bunny(name, birthday, block, box)
         farm.rabbits[name] = bunny_obj
@@ -89,3 +89,17 @@ def create_and_add_new_bunny(farm: Farm, birthday: date, name, block, box):
         return True
     else:
         return False
+
+def search_process_date_for_rabbit(rabbit: Bunny):
+    today = date.today()
+    if rabbit.all_planing_dates is not None:
+        pair_process_color = {}
+        for process, day in rabbit.all_planing_dates.items():
+            if day == today:
+                pair_process_color['today'] = process
+            elif day - today == timedelta(days=1):
+                pair_process_color['tomorrow'] = process
+            elif day - today == timedelta(days=-1):
+                pair_process_color['yesterday'] = process
+        return pair_process_color
+    return {}
