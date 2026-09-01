@@ -1,6 +1,9 @@
 from datetime import date, datetime, timedelta
 
-from bunny_classes import  Farm, Bunny
+import loguru
+
+from bunny_classes import  Farm, Bunny, Box
+
 
 BOXES = dict([(1,[x for x in range(1,21)]),(2,[x for x in range(1,21)]),(3,[x for x in range(1,21)]),(4,[x for x in range(1,21)]),
               (5,[x for x in range(1,21)]),(6,[x for x in range(1,26)]),(7,[x for x in range(1,21)]),(8,[x for x in range(1,21)]),
@@ -17,6 +20,11 @@ def looking_for_work(rabbit: Bunny):
 def set_rabbit_culling(farm: Farm, rabbit: Bunny):
     rabbit.status = 'culling'
     farm.defective.append(rabbit.name)
+
+def cancel_culling(farm: Farm, rabbit: Bunny):
+    rabbit.status = None
+    if rabbit.name in farm.defective:
+        farm.defective.remove(rabbit.name)
 
 def rewrite_block_and_box(farm: Farm, bunny, block, box):
     print(bunny.name, block, box)
@@ -85,7 +93,6 @@ def create_and_add_new_bunny(farm: Farm, birthday: str, name, block, box):
     if name not in farm.rabbits:
         bunny_obj = Bunny(name, birthday, block, box)
         farm.rabbits[name] = bunny_obj
-
         return True
     else:
         return False
@@ -103,3 +110,38 @@ def search_process_date_for_rabbit(rabbit: Bunny):
                 pair_process_color['yesterday'] = process
         return pair_process_color
     return {}
+
+def increase_quantity_in_third_room(obj:Box, quantity_field):
+    current = int(quantity_field.value) if quantity_field.value and quantity_field.value.isdigit() else 0
+
+    obj.quantity += current
+    loguru.logger.info(f'In box {obj.block}.{obj.box} + {current} bunnies')
+
+def decrease_quantity_in_third_room(obj: Box, quantity_field):
+    current = int(quantity_field.value) if quantity_field.value and quantity_field.value.isdigit() else 0
+    if current <= obj.quantity:
+        obj.quantity -= current
+        loguru.logger.info(f'In box {obj.block}.{obj.box} - {current} bunnies')
+
+def calculate_bunnies_in_block(farm: Farm, block):
+    return sum([x.quantity for x in farm.third_room.values() if x.block == block])
+
+def calculate_age_and_quantity(farm: Farm, block):
+    data = {}
+    for obj in farm.third_room.values():
+        if obj.block == block:
+            data.setdefault(obj.box_age, []).append(obj.quantity)
+
+    return data
+
+def empty_box(farm: Farm):
+    empty = {}
+    all_boxes = {}
+    for obj in farm.rabbits.values():
+        all_boxes.setdefault(obj.block, []).append(obj.box)
+
+    for block, box in BOXES.items():
+        e_b = set(box) - set(all_boxes.get(block))
+        empty.setdefault(block, []).extend(sorted([x for x in e_b]))
+
+    return empty

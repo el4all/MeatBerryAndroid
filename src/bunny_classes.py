@@ -855,6 +855,11 @@ class Box:
         data['kill_date'] = self.kill_date.strftime(DATE_FORMAT) if isinstance(data['kill_date'], date) else data['kill_date']
         return data
 
+    @property
+    def box_age(self):
+        today = date.today()
+        return (today - self.birth).days
+
     def set_kill_date(self):
         date_of_kill = self.birth + timedelta(days=100)
         self.kill_date = date_of_kill

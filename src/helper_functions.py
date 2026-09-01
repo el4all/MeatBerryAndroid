@@ -3,6 +3,7 @@ import flet as ft
 
 from datetime import date
 from bunny_classes import Bunny, Farm
+from puthon_logic_func import empty_box
 
 
 BOXES = dict([(1,20),(2,20),(3,20),(4,20),(5,20),(6,25),(7,20),(8,20),(9,20),(10,20),(11,12),(12,12)])
@@ -72,5 +73,17 @@ def who_in_box(farm: Farm, block, box):
             return obj.name
     return 'порожньо'
 
+def get_column_for_empty_box(farm: Farm, main_content):
+    dict_of_empty_boxes = empty_box(farm)
+    empty_boxes = ft.Column([ft.Text('Порожні клітки', size=16, weight=ft.FontWeight.W_500)])
+    for block, list_boxes in dict_of_empty_boxes.items():
+        if list_boxes:
+            item = ft.ListTile(leading=ft.Icon(ft.Icons.SQUARE), title=ft.Text(f'Блок {block}'),
+                               trailing=ft.Text(f'{",".join(map(str,list_boxes))}'))
+            empty_boxes.controls.append(item)
+
+    main_content.content = empty_boxes
+
+    return main_content
 
 

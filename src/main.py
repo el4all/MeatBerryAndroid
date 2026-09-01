@@ -17,10 +17,14 @@ from pathlib import Path
 from bunny_classes import Farm, Bunny, Nest, Box, STATUS_WORK
 from work_with_files import open_and_read_json, write_json
 from puthon_logic_func import (looking_for_work, set_rabbit_culling, rewrite_block_and_box, remove_by_death, remove_by_culling,
-                               vacant_index_for_rabbit, empty_boxes, create_and_add_new_bunny, search_process_date_for_rabbit)
+                               vacant_index_for_rabbit, empty_boxes, create_and_add_new_bunny, search_process_date_for_rabbit,
+                               cancel_culling, increase_quantity_in_third_room, decrease_quantity_in_third_room,
+                               calculate_bunnies_in_block, calculate_age_and_quantity)
 from helper_functions import create_rabbit_card, change_box_for_rabbit
-from buttons_filters import (BTN_SYNC, get_sort_menu, get_operations_by_rabbit, get_nest_info_container, get_text_fields_for_swap_boxes,
-                             get_operations_by_many_rabbits, get_main_container_for_trailing)
+from buttons_filters import (BTN_SYNC, get_sort_menu, get_operations_by_rabbit, get_nest_info_container,
+                             get_text_fields_for_swap_boxes,
+                             get_operations_by_many_rabbits, get_main_container_for_trailing, get_operations_by_culling,
+                             get_btn_for_operation_with_box, get_btns_for_box_str, get_btn_by_farm_info, get_btn_for_operation_in_third_room)
 
 URL = 'https://drive.google.com/uc?export=download&id=1459S6Uo3w-f5i5KnDhV5XG0RFCNBDLgW'
 DATE_FORMAT = '%d.%m.%Y'
@@ -75,12 +79,14 @@ def main(page: ft.Page):
     main_content = ft.Container(expand=True)
 
     page.title = "Моя Ферма"
+    page.bgcolor = '#FFFFFF'
     page.scroll = ft.ScrollMode.AUTO  # Дозволяє гортати екран, якщо список великий
     dialog = ft.AlertDialog(title='eeee', modal=True)
 
     page.overlay.append(dialog)
 
     navigation = []
+    current_scroll = getattr(page, 'rabbits_scroll_offset',0)
 
     def open_alert_dialog():
         dialog.open = True
@@ -109,6 +115,12 @@ def main(page: ft.Page):
         navigation.append((func, args))
         func(*args)
 
+    def save_scroll_position(e: ft.OnScrollEvent):
+        print(current_scroll)
+        setattr(page,'rabbits_scroll_offset', e.pixels)
+        print(getattr(page,'rabbits_scroll_offset'))
+        print(e)
+
     def go_back():
         if len(navigation) > 1:
             navigation.pop()
@@ -133,11 +145,12 @@ def main(page: ft.Page):
 
         main_content.content = ft.Column([ft.Text('Головне меню ферми', size=16, weight=ft.FontWeight.W_500),
                                           ft.ListTile(leading=ft.Icon(ft.Icons.PETS), title=ft.Text('Кролиці'), on_click=lambda e: navigate_to(show_rabbit_list)),
-                                          ft.ListTile(leading=ft.Icon(ft.Icons.PETS), title=ft.Text('Третя кімната'), on_click=lambda e: navigate_to(show_third_room_list)),
+                                          ft.ListTile(leading=ft.Icon(ft.Icons.PETS), title=ft.Text('Третя кімната'), on_click=lambda e: navigate_to(show_third_room_block_list)),
                                           ft.ListTile(leading=ft.Icon(ft.Icons.NIGHTLIFE), title=ft.Text('Вибраківка'), on_click= lambda e: navigate_to(show_defective))
                                           ])
         set_appbar(right_actions=BTN_SYNC)
-        set_bottom_app_bar()
+        btn_info = get_btn_by_farm_info(meatberry, main_content, navigate_to)
+        set_bottom_app_bar(left_button=btn_info)
         main_content.update()
 
     page.appbar = ft.AppBar(title=ft.Text('MeatBerryFarm'),
@@ -145,12 +158,13 @@ def main(page: ft.Page):
 
     page.bottom_appbar = ft.BottomAppBar(padding=10,
                               content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                              controls=[ft.Button('<-- Назад', on_click= lambda  e: show_main_menu()), ft.Text('v1.0')]))
+                                             controls=[ft.Button('<-- Назад', on_click= lambda  e: show_main_menu()), ft.Text('v1.0')]))
 
     page.add(main_content)
     page.update()
 
     def show_rabbit_list(by_what=None, check_box=None):
+
         def handle_operation(e):
             operation = e.control.data
             if operation == 'add_rabbit':
@@ -166,7 +180,9 @@ def main(page: ft.Page):
             show_rabbit_list(by_what=select_sort)
         sort_btn = get_sort_menu(show_rabbits_list=handle_sort)
         set_appbar(left_actions=BTN_SYNC, right_actions=sort_btn)
-        bunnies = ft.Column()
+        bunnies = ft.Column(expand=True, scroll=ft.ScrollMode.AUTO, on_scroll=save_scroll_position)
+        if current_scroll > 0:
+            bunnies.scroll_to(offset=current_scroll, duration=0)
         text = ft.Text('Список кролиць', size=22, weight=ft.FontWeight.BOLD)
 
         names = []
@@ -208,17 +224,37 @@ def main(page: ft.Page):
         main_content.content = bunnies
         main_content.update()
 
-    def show_third_room_list():
+    def show_third_room_block_list():
         set_appbar()
-        set_bottom_app_bar()
+        left_btn = get_btn_for_operation_in_third_room()
+        set_bottom_app_bar(left_button=left_btn)
 
+        all_blocks = ft.Column([ft.Text('Відгодівля', size=16, weight=ft.FontWeight.W_500)])
+        used_blocks = sorted([x for x in set(x.block for x in meatberry.third_room.values())])
+
+
+        for el in used_blocks:
+            quantity_bunnies = calculate_bunnies_in_block(meatberry, el)
+            column_for_trailing = ft.Column(tight=True)
+            data_for_block = calculate_age_and_quantity(meatberry, el)
+            for d, q in data_for_block.items():
+                item = ft.Text(f'{d} дн. -- {sum(q)} шт.')
+                column_for_trailing.controls.append(item)
+            item = ft.ListTile(leading=ft.Icon(ft.Icons.HOUSE), title=ft.Text(f'Блок {el}'),
+                               trailing=column_for_trailing,
+                               on_click=lambda e, block=el: navigate_to(show_third_room_boxes_in_block, block))
+            all_blocks.controls.append(item)
+            main_content.content = all_blocks
+            main_content.update()
+
+    def show_third_room_boxes_in_block(block: int):
         boxes = ft.Column()
-
-        for num, cages in meatberry.third_room.items():
-            obj_box = meatberry.third_room[num]
-            item = ft.ListTile(leading=ft.Icon(ft.Icons.GRID_VIEW), title=ft.Text(num), subtitle=ft.Text(f"Клітка: {num}"),
-                               on_click=lambda e, b=obj_box: navigate_to(show_str_box, b))
-            boxes.controls.append(item)
+        for box_obj in meatberry.third_room.values():
+            if box_obj.block == block:
+                item = ft.ListTile(leading=ft.Icon(ft.Icons.GRID_VIEW), title=ft.Text(f'{block}.{box_obj.box}'),
+                                   subtitle=ft.Text(box_obj.birth.strftime(DATE_FORMAT)), trailing=ft.Text(f'{box_obj.box_age} дн.'),
+                                   on_click=lambda e, box=box_obj: navigate_to(show_str_box, box))
+                boxes.controls.append(item)
 
         main_content.content = boxes
         main_content.update()
@@ -232,8 +268,10 @@ def main(page: ft.Page):
 
             if operation == 'set_culling':
                 set_rabbit_culling(meatberry, bunny)
+                report = f'{bunny.name} помічена як вибраковка'
+                quick_message(report, False)
                 show_str_rabbit(bunny)
-                logger.info(f'{bunny.name} помічена як вибраковка')
+                logger.info(report)
 
             elif operation == 'swap_box':
                 def handle_input(e):
@@ -243,33 +281,42 @@ def main(page: ft.Page):
                 def handle_save(e):
                     if change_box_for_rabbit(meatberry, block_input, box_input, result_field):
                         block, box = change_box_for_rabbit(meatberry, block_input, box_input, result_field)
+                        old_address = bunny.str_block_box
                         rewrite_block_and_box(meatberry, bunny, block, box)
                         navigate_to(show_str_rabbit,bunny)
+                        report = (f'{bunny.name} --> {block_input.value}.{box_input.value}  '
+                                  f' {old_address} <-- {result_field.value.split()[-1]}')
+                        quick_message(report, False)
+                        logger.info(report)
                 main_content.content = ft.Column(controls=[ft.Text(f'Картка: {bunny.name}', size=22, weight=ft.FontWeight.BOLD),
                                                            ft.Text(value=str(bunny), size=20),
                                                            ft.Divider(),
                                                            block_input, box_input, result_field,
                                                            ft.Button(content=ft.Text('Підтвердити'), on_click=handle_save)])
                 main_content.update()
-                logger.info(f'{bunny.name} --> {block_input}.{box_input}')
 
             elif operation == 'remove_by_death':
                 remove_by_death(meatberry, bunny)
-                open_alert_dialog()
-                dialog.title = ft.Text(f'Кролиця {bunny.name} видалена')
-                dialog.actions = [ft.Button('OK', on_click=show_rabbit_list)]
-                dialog.update()
+                report = f'Кролиця {bunny.name} видалена'
+                quick_message(report, False)
                 logger.info(f'{bunny.name} померла')
+                show_rabbit_list()
 
             elif operation == 'remove_by_culling':
                 remove_by_culling(meatberry, bunny)
-                open_alert_dialog()
-                dialog.title = ft.Text(f'Кролиця {bunny.name} видалена')
-                dialog.actions = [ft.Button('OK', on_click=show_rabbit_list)]
-                dialog.update()
+                report = f'Кролиця {bunny.name} видалена'
+                quick_message(report, False)
                 logger.info(f'{bunny.name} вибракована')
+                navigation[-2][0](navigation[-2][1])
 
-        right_button = get_operations_by_rabbit(handle_operation)
+            elif operation == 'cancel_culling':
+                cancel_culling(meatberry, bunny)
+                report = f'Вибраківка {bunny.name} скасована'
+                quick_message(report, False)
+                logger.info(report)
+                navigation[-2][0](navigation[-2][1])
+
+        right_button = get_operations_by_rabbit(handle_operation) if navigation[-2][0] == show_rabbit_list else get_operations_by_culling(handle_operation)
         set_bottom_app_bar()
         info = ft.Text(value=str(bunny), size=20)
 
@@ -280,6 +327,19 @@ def main(page: ft.Page):
         page.update()
 
     def show_str_box(box: Box):
+
+        def handle_operation(e):
+            if e.control.data == 'change_quantity':
+                quantity_field, plus_btn, minus_btn = get_btns_for_box_str()
+                plus_btn.on_click = lambda e: (increase_quantity_in_third_room(box, quantity_field), show_str_box(box))
+                minus_btn.on_click = lambda e: (decrease_quantity_in_third_room(box, quantity_field), show_str_box(box))
+                main_content.content = ft.Column([ft.Divider(),
+                                                  ft.Text(f'Картка: {box.block}.{box.box}', size=22, weight=ft.FontWeight.BOLD),
+                                                  info, quantity_field, plus_btn, minus_btn])
+                main_content.update()
+
+        btn_op = get_btn_for_operation_with_box(handle_operation)
+        set_appbar(right_actions=btn_op)
         info = ft.Text(value=str(box), size=20)
 
         main_content.content = ft.Column([ft.Divider(), ft.Text(f'Картка: {box.block}.{box.box}', size=22, weight=ft.FontWeight.BOLD), info])
@@ -287,7 +347,6 @@ def main(page: ft.Page):
         main_content.update()
 
     def show_defective(e=None):
-
         text = ft.Text(f'Вибраковані кролиці ({len(meatberry.defective)})', size=22, weight=ft.FontWeight.BOLD)
         culling = ft.Column([text])
 
@@ -331,11 +390,12 @@ def main(page: ft.Page):
             dialog.update()
 
         def final_create_bunny():
-            dict_to_create_rabbit['block'] = block_field.value
-            dict_to_create_rabbit['box'] = box_field.value
+            dict_to_create_rabbit['block'] = int(block_field.value)
+            dict_to_create_rabbit['box'] = int(box_field.value)
+            obj = create_and_add_new_bunny(meatberry, dict_to_create_rabbit['birthday'], dict_to_create_rabbit['name'],
+                                     dict_to_create_rabbit['block'], dict_to_create_rabbit['box'])
 
-            if create_and_add_new_bunny(meatberry, dict_to_create_rabbit['birthday'], dict_to_create_rabbit['name'],
-                                     dict_to_create_rabbit['block'], dict_to_create_rabbit['box']):
+            if obj:
                 dialog.title = ft.Text('Кролицю додано')
                 dialog.content = ft.Text(f'')
                 dialog.actions = [ft.Button('OK', on_click=close_alert_dialog)]

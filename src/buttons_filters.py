@@ -1,12 +1,13 @@
 import  flet as ft
-from bunny_classes import Bunny
-from helper_functions import create_rabbit_card
+
+from bunny_classes import Bunny, Farm
+from helper_functions import create_rabbit_card, get_column_for_empty_box
 
 STATUS_FOR_NEST = dict([('install', 'встановлене порожнє'), ('close', 'встановлене з кролями'),
                         ('open', 'відкрите'), ('remove', 'без будки з кролями')])
 STATUS_WORK = dict([('mate','запліднення'),('palpation','пальпація'),('kindling','окрол'),('install nest','монтаж гнізда'),
                     ('open nest',"відкривання гнізда"),('remove nest','демонтаж гнізда'),('resettle','переселення'),
-                    ('vaccination nest','вакцинація гнізда'),('prepare nest','підготовка гнізда'),('swap box','перміщення'),
+                    ('vaccination nest','вакцинація гнізда'),('prepare nest','підготовка гнізда'),('swap box','переміщення'),
                     (None,'')])
 
 BTN_SYNC = ft.IconButton(icon=ft.Icons.SYNC, tooltip='Синхронізувати з GoogleDisc')
@@ -29,9 +30,17 @@ def get_sort_menu(show_rabbits_list):
 def get_operations_by_rabbit(handle_operation):
     return ft.PopupMenuButton(tooltip='Операції',
                               items=[ft.PopupMenuItem(content=ft.Text('Видалити кролицю (смерть)'), data='remove_by_death', on_click=handle_operation),
-                                     ft.PopupMenuItem(content=ft.Text('Видалити кролицю (вибраковка)'), data='remove_by_culling',on_click=handle_operation),
+                                     ft.PopupMenuItem(content=ft.Text('Видалити кролицю (забій)'), data='remove_by_culling',on_click=handle_operation),
                                      ft.PopupMenuItem(content=ft.Text('Встановити як вибраківку'), data='set_culling', on_click=handle_operation),
                                      ft.PopupMenuItem(content=ft.Text('Переміщення'), data='swap_box', on_click=handle_operation)])
+
+def get_operations_by_culling(handle_operation):
+    return ft.PopupMenuButton(tooltip='Операції',
+                              items=[ft.PopupMenuItem(content=ft.Text('Видалити кролицю (забій)'),
+                                                   data='remove_by_culling', on_click=handle_operation),
+                                     ft.PopupMenuItem(content=ft.Text('Скасувати вибраківку'),
+                                                      data='cancel_culling', on_click=handle_operation)
+                                     ])
 
 def get_nest_info_container(rabbit: Bunny):
     return ft.Container(content=ft.Column(controls=[ft.Text(f'Гніздо {rabbit.name}', weight=ft.FontWeight.BOLD, size=20),
@@ -93,8 +102,28 @@ def get_main_container_for_trailing(data: dict):
 
     return trailing_widget
 
-# trailing for item in show_rabbits_list()
-# ft.Row(controls=[ft.Text(STATUS_WORK.get(process, ''), size=14, weight=ft.FontWeight.BOLD),
-#                  ft.Checkbox(value=False, on_change=lambda e: print('Flag worked'))] if check_box else [ft.Text(STATUS_WORK.get(process, ''),
-#                                                                                                                 size=14, weight=ft.FontWeight.BOLD)],
-#                                                 tight=True),
+def get_btn_for_operation_with_box(handle_operation):
+    return ft.PopupMenuButton(items=[ft.PopupMenuItem(content=ft.Text('Змінити кількість мешканців'), data='change_quantity', on_click=handle_operation)])
+
+def get_btns_for_box_str():
+    quantity = ft.TextField(label='Кількість', keyboard_type=ft.KeyboardType.NUMBER)
+    increase_btn = ft.Button('Додати')
+    decrease_btn = ft.Button('Відняти')
+    return quantity, increase_btn, decrease_btn
+
+def get_btn_by_farm_info(farm: Farm, main_content, navigate_to):
+    return ft.PopupMenuButton(content= ft.Row([ft.Text('Інформація', size=14, weight=ft.FontWeight.BOLD),
+                                               ft.Icon(ft.Icons.ARROW_DROP_UP_SHARP)],
+                                              tight=True),
+                              tooltip='Інформація по фермі',
+                              items=[ft.PopupMenuItem(content=ft.Text('Порожні клітки'), data='empty_boxes',
+                                                      on_click=lambda e: (navigate_to(get_column_for_empty_box, farm, main_content), main_content.update())),
+                                     ft.PopupMenuItem(content=ft.Text('Рейтинг'), data='rating')])
+
+def get_btn_for_operation_in_third_room():
+    return ft.PopupMenuButton(content= ft.Row([ft.Text('Операції', size=14, weight=ft.FontWeight.BOLD),
+                                               ft.Icon(ft.Icons.ARROW_DROP_UP_SHARP)],
+                                              tight=True),
+                              tooltip='Операції',
+                              items=[ft.PopupMenuItem(content=ft.Text('Додати клітку'),
+                                                   data='add_box')])
