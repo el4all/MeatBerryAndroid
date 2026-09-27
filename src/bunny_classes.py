@@ -11,13 +11,14 @@ STATUS_WORK = dict([('mate','запліднення'),('palpation','пальпа
                     ('vaccination nest','вакцинація гнізда'),('prepare nest','підготовка гнізда'),('swap box','перміщення')])
 STATUS_FOR_STR = {'mated': 'очікує на пальпацію', 'waiting_for_kindling': 'очікує на окріл', 'mother': 'матір',
           'mated mother': 'запліднена матір', 'mother*': 'матір без гнізда', 'culling': 'вибраківка', None:'немає'}
-STATUS_FOR_3_ROOM = {'meat': "м'ясо", 'repare': 'ремонт', 'feeding': 'догодівля'}
+STATUS_FOR_3_ROOM = {'meat': "відгодівля", 'repare': 'ремонт', 'feeding': 'догодівля'}
 DATE_FORMAT = '%d.%m.%Y'
 DAYS = ['Понеділок',"Вівторок","Середа","Четвер","П'ятниця","Субота","Неділя"]
 
 
 class Farm:
     def __init__(self, name='MeatBerry'):
+
         self.name = name
         self.rabbits: dict[str, Bunny] = {}
         self.third_room: dict[str, Box] = {}
@@ -87,6 +88,18 @@ class Farm:
             if name in self.defective:
                 self.defective.remove(name)
             logger.info(f'{date.today().strftime(DATE_FORMAT)}: Bunny {name} deleted. Box {old_box} free.')
+
+    def remove_nests(self, list_of_rabbits, list_of_quantity):
+        for name, quantity in zip(list_of_rabbits, list_of_quantity):
+            if name in self.rabbits:
+                if self.rabbits[name].nest is not None:
+                    self.rabbits[name].nest.remove_nest()
+                    self.rabbits[name].kindling[self.rabbits[name].last_kindling]['from_nest'] = quantity
+                    logger.info(f'{name} nest was remove.')
+                else:
+                    logger.info(f'{name} has not nest.')
+            else:
+                logger.info(f'{name} not founded.')
 
     def mate(self,name_sheet, date_mate=None):
         if date_mate is None:
@@ -195,6 +208,7 @@ class Farm:
             logger.info(f'{name_in_from} -> {to_box}  '
                 f'{name_in_to} -> {from_box}  ')
         elif name_in_to is None:
+            self.rabbits[name_in_from].block = new_block
             self.rabbits[name_in_from].box = new_box
             logger.info(f'{name_in_from} -> {to_box}  '
                   f'{from_box} is empty.')
@@ -318,6 +332,17 @@ class Farm:
 
         return f'Free {free},\n More then one {more_then_one}'
 
+    def loose_nest(self, names: list):
+        for name in names:
+            obj = self.rabbits[name]
+            obj.nest = None
+            obj.status = 'mother*'
+            for i in range(len(obj.history)-1, -1, -1):
+                if isinstance(obj.history[i], list):
+                    obj.history[i] = 'LN'
+                    break
+            logger.info(f'{name} loose nest.')
+
     def vacant_indexes(self, line):
         indexes = []
         for x in self.rabbits.keys():
@@ -425,7 +450,7 @@ class Farm:
             print('Not founded')
 
 class Bunny:
-    def __init__(self, name, birthday: str, block ,box, status=None, **kwargs):
+    def __init__(self, name, birthday: str, block ,box, **kwargs):
 
         self.name = name   # ID bunny
 
@@ -435,7 +460,9 @@ class Bunny:
 
         self.birthday = birthday
 
-        self.status = status
+        self.status = kwargs.get('status')
+
+        self.sex = kwargs.get('sex')
 
         def parse_date(value):
             if isinstance(value, str):
@@ -479,8 +506,8 @@ class Bunny:
 
     def __str__(self):
         kindling = len(self.kindling)
-        alive = sum(v[1] for v in self.kindling.values())
-        dead = sum(v[2] for v in self.kindling.values())
+        alive = sum(v['alive'] for v in self.kindling.values())
+        dead = sum(v['dead'] for v in self.kindling.values())
         formed = 0
         resettle = 0
         for x in self.history:
@@ -643,7 +670,7 @@ class Bunny:
     def get_kindling(self, total, alive, dead, formed, kind_date=None):
         if kind_date is None:
             kind_date = date.today()
-        self.kindling[datetime.strptime(kind_date, DATE_FORMAT).date() if isinstance(kind_date, str) else kind_date] = (total, alive, dead)
+        self.kindling[kind_date] = dict([('total',total),('alive',alive),('dead',dead),('formed',formed)])
         self.last_kindling = datetime.strptime(kind_date, DATE_FORMAT).date() if isinstance(kind_date, str) else kind_date
         self.history[-1] = [alive, dead, formed, '?'] if self.history[-1] == '+' else self.history.append([alive, dead, formed, '?'])
         self.status = 'mother' if formed else 'mother*'
@@ -676,6 +703,7 @@ class Bunny:
     def get_resettle_bunnies(self, resettle_date=None, bunnies=None, new_cage=None):
         date_resettle = resettle_date.strftime(DATE_FORMAT) if resettle_date is not None else date.today().strftime(DATE_FORMAT)
         quantity = bunnies if bunnies is not None else self.nest.get_resettle_nest(new_cage)
+        self.kindling[self.last_kindling]['resettle'] = quantity
         self.history[-2][3] = quantity
         percent = quantity / self.nest.bunnies.get('formed') * 100 if quantity else 0
 
@@ -814,7 +842,6 @@ class Nest:
         }
 
         return export_data
-
 
 class Box:
     def __init__(self, block, box, quantity, birth, status= None, mother=None, father=None,  kill_date=None):

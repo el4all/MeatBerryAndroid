@@ -2,12 +2,17 @@ from datetime import date, datetime, timedelta
 
 import loguru
 
+from datetime import  date
 from bunny_classes import  Farm, Bunny, Box
 
 
 BOXES = dict([(1,[x for x in range(1,21)]),(2,[x for x in range(1,21)]),(3,[x for x in range(1,21)]),(4,[x for x in range(1,21)]),
               (5,[x for x in range(1,21)]),(6,[x for x in range(1,26)]),(7,[x for x in range(1,21)]),(8,[x for x in range(1,21)]),
               (9,[x for x in range(1,21)]),(10,[x for x in range(1,21)]),(11,[x for x in range(1,13)]),(12,[x for x in range(1,13)])])
+
+STATUS_WORK = dict([('mate','запліднення'),('palpation','пальпація'),('kindling','окрол'),('install nest','монтаж гнізда'),
+                    ('open nest',"відкривання гнізда"),('remove nest','демонтаж гнізда'),('resettle','переселення'),
+                    ('vaccination nest','вакцинація гнізда'),('prepare nest','підготовка гнізда'),('swap box','перміщення')])
 
 def looking_for_work(rabbit: Bunny):
     today = date.today()
@@ -19,7 +24,10 @@ def looking_for_work(rabbit: Bunny):
 
 def set_rabbit_culling(farm: Farm, rabbit: Bunny):
     rabbit.status = 'culling'
-    farm.defective.append(rabbit.name)
+    if rabbit.name not in farm.defective:
+        farm.defective.append(rabbit.name)
+        return True
+    return False
 
 def cancel_culling(farm: Farm, rabbit: Bunny):
     rabbit.status = None
@@ -145,3 +153,89 @@ def empty_box(farm: Farm):
         empty.setdefault(block, []).extend(sorted([x for x in e_b]))
 
     return empty
+
+def add_box_in_third_room(farm: Farm, dict_attr):
+    box_obj = Box(dict_attr['block'], dict_attr['box'],dict_attr['quantity'], dict_attr['birth'], dict_attr['status'])
+    farm.third_room[f'{box_obj.block}.{box_obj.box}'] = box_obj
+    box_obj.set_kill_date()
+
+def get_dates_for_processes(farm: Farm, process):
+
+    dates = []
+    for obj in farm.rabbits.values():
+        attr = getattr(obj, process)
+        for el in attr:
+            if not el in dates:
+                dates.append(el)
+
+    return sorted(dates, reverse=True)
+
+def get_result_of_mates(farm: Farm, date_of_mate: date):
+
+    results = {}
+
+    for obj in farm.rabbits.values():
+        for day, info in obj.mate.items():
+            if day == date_of_mate:
+                result = info.get('result')
+                results[result] = results.get(result, 0) + 1
+
+    return results
+
+def get_info_of_one_mate(farm: Farm, day: date):
+    res = []
+    for obj in farm.rabbits.values():
+        for d, info in obj.mate.items():
+            if d == day:
+                res.append([obj.name, info.get('father_line'), info.get('result')])
+
+    return res
+
+def get_info_of_one_kindling(farm: Farm, day: date):
+    res = []
+    for obj in farm.rabbits.values():
+        for d, info in obj.kindling.items():
+            if d == day:
+                res.append([obj.name, info.get('father_line'), info.get('result')])
+
+    return res
+
+def get_all_planning_for_process(farm: Farm, process):
+    need = {}
+    for obj in farm.rabbits.values():
+        for p, d in obj.all_planing_dates.items():
+            if p == process:
+                need.setdefault(d, []).append(obj.name)
+
+    return need
+
+def get_all_planning_for_today(farm: Farm):
+    today = date.today()
+    need = {}
+    for obj in farm.rabbits.values():
+        for p, d in obj.all_planing_dates.items():
+            if d == today:
+                need.setdefault(p, []).append(obj.name)
+
+    if need:
+        for p, l in need.items():
+            need[p] = sorted(l, key=lambda x: (farm.rabbits[x].block, farm.rabbits[x].box))
+
+    return need
+
+def average_age_rabbits(farm: Farm, sex):
+    avg_age = 0
+
+    for obj in farm.rabbits.values():
+        if obj.sex == sex:
+            avg_age += obj.age
+
+    return round(avg_age / len([x for x in farm.rabbits.values() if x.sex == sex]))
+
+def loose_nest(obj):
+        obj.nest = None
+        obj.status = 'mother*'
+        for i in range(len(obj.history)-1, -1, -1):
+            if isinstance(obj.history[i], list):
+                obj.history[i] = 'LN'
+                break
